@@ -1,19 +1,16 @@
-FROM python:3.7
+FROM python:3.11
 
-RUN pip install virtualenv
-ENV VIRTUAL_ENV=/venv
-RUN virtualenv venv -p python3
-ENV PATH="VIRTUAL_ENV/bin:$PATH"
+EXPOSE 8085
 
 WORKDIR /app
-ADD . /app
 
-# Install dependencies
+COPY . ./
+
+RUN apt-get update && \
+    apt-get install -y \
+    libgl1-mesa-glx 
+
 RUN pip install -r requirements.txt
-RUN apt-get update
 
-# Expose port 
-ENV PORT 8501
+ENTRYPOINT ["streamlit", "run", "app.py", "--server.port=8085", "--server.address=0.0.0.0"]
 
-# Run the application:
-CMD ["streamlit","run","app.py"]

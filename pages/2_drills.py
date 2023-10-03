@@ -4,6 +4,9 @@ from streamlit_image_coordinates import streamlit_image_coordinates
 from streamlit_extras.dataframe_explorer import dataframe_explorer
 from streamlit_image_select import image_select
 
+from transformers import SamModel, SamProcessor
+
+
 st.title("✨ Drilling CPSD  🏜")
 st.info(' Let me help generate segments for any of your images. 😉')
 
@@ -11,14 +14,39 @@ st.info(' Let me help generate segments for any of your images. 😉')
 def mask_generate():
     sam_checkpoint = "model/sam_vit_h_4b8939.pth"
     model_type = "vit_h"
-    device = "cuda"
+    device = "cpu"
 
     sam = sam_model_registry[model_type](checkpoint=sam_checkpoint)
     sam.to(device=device)
-    mask_generator = SamAutomaticMaskGenerator(sam)
+
+
+    #device = "cuda" if torch.cuda.is_available() else "cpu"
+    #sam = SamModel.from_pretrained("facebook/sam-vit-huge").to(device)
+    mask_generator = SamPredictor(sam)
 
     return mask_generator 
 
+@st.cache_resource()
+def unetModel():
+    model = segModule.Unet()
+    model.compile(optimizer=Adam(), loss=segModule.weighted_crossentropy, metrics=["accuracy"])
+    model.load_weights('./checkpoints/seg_model')
+    return model
+
+@st.cache_data()
+def onSeg(big_im, _sam, _model):
+    big_im_pred = segModule.predict_big_image(big_im, _model, I=256)
+    # decreasing the 'dbs_max_dist' parameter results in more SAM prompts (and longer processing times):
+    labels, grains, coords = segModule.label_grains(big_im, big_im_pred, dbs_max_dist=10.0)
+    all_grains, labels, mask_all, grain_data, big_im = segModule.sam_segmentation(_sam, big_im, big_im_pred, coords, labels, min_area=50.0 )
+    return all_grains, labels, mask_all, grain_data, big_im
+
+def mo(big_im,all_grains,labels):
+    # plot results again if necessary
+    fig, ax = plt.subplots(figsize=(15,10))
+    ax.imshow(big_im)
+    segModule.plot_image_w_colorful_grains(big_im, all_grains, ax, cmap='Paired')
+    segModule.plot_grain_axes_and_centroids(all_grains, labels, ax, linewidth=1, markersize=10)
 
 
 
@@ -65,8 +93,8 @@ def graphs(tab2):
     tab2.pyplot(fig)
 
 
-seg_sam=seg_mask_generate()
-unet=unetModel()
+#seg_sam=mask_generate()
+#unet=unetModel()
 
 
 
